@@ -174,7 +174,7 @@ namespace nmarkov {
   }
 }
 
-PYBIND11_MODULE(nmarkov, m) {
+PYBIND11_MODULE(_nmarkov, m) {
   m.doc() = "Numerical computation for Markov chains";
 
   py::class_<marlib::marlib_params>(m, "Params")
