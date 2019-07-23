@@ -1,4 +1,6 @@
 #include "nmarkov.h"
+#include "deformula.h"
+
 #include <tuple>
 
 namespace nmarkov {
@@ -172,6 +174,88 @@ namespace nmarkov {
       throw std::runtime_error("The argument x is neither vector nor dense matrix.");
     }
   }
+
+  template <typename T1, typename TR, typename MatT, typename VecT>
+  dpyarray ctmc_mexp_mix(TR, const T1& Q, const dpyarray& x, const dpyarray& w, const dpyarray& t, Params& params, MatT, VecT) {
+    T1 P = clone(Q, MatT());
+    dpyarray x0 = clone(x, VecT());
+    dpyarray y = clone(x, VecT());
+    marlib::mexp_mix(TR(), P, x0, y, w, t, params,
+              [](Params& params){
+                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                },
+              [](Params){},
+              MatT(), VecT());
+    return y;
+  }
+
+  template <typename T1, typename MatT>
+  dpyarray ctmc_mexp_mix(const T1& Q, const dpyarray& x, const dpyarray& w, const dpyarray& t, bool trans, Params& params) {
+    int ndim = const_cast<dpyarray&>(x).request().ndim;
+    if (ndim == 1 && trans) {
+      return ctmc_mexp_mix(marlib::TRANS(), Q, x, w, t, params, MatT(), marlib::ArrayT());
+    } else if (ndim == 1 && !trans) {
+      return ctmc_mexp_mix(marlib::NOTRANS(), Q, x, w, t, params, MatT(), marlib::ArrayT());
+    } else if (ndim == 2 && trans) {
+      return ctmc_mexp_mix(marlib::TRANS(), Q, x, w, t, params, MatT(), marlib::DenseMatrixT());
+    } else if (ndim == 2 && !trans) {
+      return ctmc_mexp_mix(marlib::NOTRANS(), Q, x, w, t, params, MatT(), marlib::DenseMatrixT());
+    } else {
+      throw std::runtime_error("The argument x is neither vector nor dense matrix.");
+    }
+  }
+
+  template <typename T1, typename TR, typename MatT, typename VecT>
+  std::tuple<dpyarray,dpyarray> ctmc_mexpint_mix(TR, const T1& Q, const dpyarray& x, const dpyarray& cx,
+    const dpyarray& w, const dpyarray& t, Params& params, MatT, VecT) {
+    T1 P = clone(Q, MatT());
+    dpyarray x0 = clone(x, VecT());
+    dpyarray cx0 = clone(cx, VecT());
+    dpyarray y = clone(x, VecT());
+    dpyarray cy = clone(cx, VecT());
+    marlib::mexpint_mix(TR(), P, x0, cx0, y, cy, w, t, params,
+              [](Params& params){
+                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                },
+              [](Params){},
+              MatT(), VecT());
+    return std::make_tuple(y, cy);
+  }
+
+  template <typename T1, typename MatT>
+  std::tuple<dpyarray,dpyarray> ctmc_mexpint_mix(const T1& Q, const dpyarray& x, const dpyarray& cx,
+    const dpyarray& w, const dpyarray& t, bool trans, Params& params) {
+    int ndim = const_cast<dpyarray&>(x).request().ndim;
+    if (ndim == 1 && trans) {
+      return ctmc_mexpint_mix(marlib::TRANS(), Q, x, cx, w, t, params, MatT(), marlib::ArrayT());
+    } else if (ndim == 1 && !trans) {
+      return ctmc_mexpint_mix(marlib::NOTRANS(), Q, x, cx, w, t, params, MatT(), marlib::ArrayT());
+    } else if (ndim == 2 && trans) {
+      return ctmc_mexpint_mix(marlib::TRANS(), Q, x, cx, w, t, params, MatT(), marlib::DenseMatrixT());
+    } else if (ndim == 2 && !trans) {
+      return ctmc_mexpint_mix(marlib::NOTRANS(), Q, x, cx, w, t, params, MatT(), marlib::DenseMatrixT());
+    } else {
+      throw std::runtime_error("The argument x is neither vector nor dense matrix.");
+    }
+  }
+
+  template <typename Function, typename Integrate>
+  std::tuple<double,dpyarray,dpyarray,dpyarray,double,int> deformula_integrate(Function f, double zero, double reltol, int startd, int maxiter) {
+    Integrate de;
+    de.getWeight(f, zero, reltol, startd, maxiter);
+    const int n = de.getSize();
+    dpyarray t(n);
+    dpyarray x(n);
+    dpyarray w(n);
+    de.getTValue(t.mutable_data(), t.mutable_data() + n);
+    de.getXValue(x.mutable_data(), x.mutable_data() + n);
+    de.getWValue(w.mutable_data(), w.mutable_data() + n);
+    double s = de.getSum();
+    double h = de.getH();
+    int info = de.getInfo();
+    return std::make_tuple(s, x, w, t, h, info);
+  }
+
 }
 
 PYBIND11_MODULE(_nmarkov, m) {
@@ -339,17 +423,73 @@ PYBIND11_MODULE(_nmarkov, m) {
     [](const py::object& Q, const dpyarray& x, const dpyarray& cx, const dpyarray& rwd, const dpyarray& t, bool trans, marlib::marlib_params& params) {
       std::string mattype = py::reinterpret_borrow<py::str>(Q.attr("format"));
       if (mattype == "csr") {
-        return nmarkov::ctmc_tran_rwd<py::object,marlib::CSRMatrixT>(Q, x, cx, rwd, t, trans, params);
+        auto result = nmarkov::ctmc_tran_rwd<py::object,marlib::CSRMatrixT>(Q, x, cx, rwd, t, trans, params);
+        return result;
       } else if (mattype == "csc") {
-        return nmarkov::ctmc_tran_rwd<py::object,marlib::CSCMatrixT>(Q, x, cx, rwd, t, trans, params);
+        auto result = nmarkov::ctmc_tran_rwd<py::object,marlib::CSCMatrixT>(Q, x, cx, rwd, t, trans, params);
+        dpyarray& irwd = std::get<2>(result);
+        return result;
       } else if (mattype == "coo") {
-        return nmarkov::ctmc_tran_rwd<py::object,marlib::COOMatrixT>(Q, x, cx, rwd, t, trans, params);
+        auto result = nmarkov::ctmc_tran_rwd<py::object,marlib::COOMatrixT>(Q, x, cx, rwd, t, trans, params);
+        return result;
       } else {
         throw std::runtime_error("Q is either csr, csc and coo.");
       }
     },
     py::arg("Q"), py::arg("x"), py::arg("cx"), py::arg("rwd"), py::arg("t"), py::arg("trans"), py::arg("params"),
     "Compute the transient rewards with uniformization");
+
+  m.def("ctmc_mexp_mix_dense",
+    nmarkov::ctmc_mexp_mix<dpyarray,marlib::DenseMatrixT>,
+    py::arg("Q"), py::arg("x"), py::arg("w"), py::arg("t"), py::arg("trans"), py::arg("params"),
+    "Compute the mixture of matrix exponential with uniformization");
+
+  m.def("ctmc_mexp_mix_sparse",
+    [](const py::object& Q, const dpyarray& x, const dpyarray& w, const dpyarray& t, bool trans, marlib::marlib_params& params) {
+      std::string mattype = py::reinterpret_borrow<py::str>(Q.attr("format"));
+      if (mattype == "csr") {
+        return nmarkov::ctmc_mexp_mix<py::object,marlib::CSRMatrixT>(Q, x, w, t, trans, params);
+      } else if (mattype == "csc") {
+        return nmarkov::ctmc_mexp_mix<py::object,marlib::CSCMatrixT>(Q, x, w, t, trans, params);
+      } else if (mattype == "coo") {
+        return nmarkov::ctmc_mexp_mix<py::object,marlib::COOMatrixT>(Q, x, w, t, trans, params);
+      } else {
+        throw std::runtime_error("Q is either csr, csc and coo.");
+      }
+    },
+    py::arg("Q"), py::arg("x"), py::arg("w"), py::arg("t"), py::arg("trans"), py::arg("params"),
+    "Compute the mixture of matrix exponential with uniformization");
+
+  m.def("ctmc_mexpint_mix_dense",
+    nmarkov::ctmc_mexpint_mix<dpyarray,marlib::DenseMatrixT>,
+    py::arg("Q"), py::arg("x"), py::arg("cx"), py::arg("w"), py::arg("t"), py::arg("trans"), py::arg("params"),
+    "Compute the mixture of matrix exponential with uniformization");
+
+  m.def("ctmc_mexpint_mix_sparse",
+    [](const py::object& Q, const dpyarray& x, const dpyarray& cx, const dpyarray& w, const dpyarray& t, bool trans, marlib::marlib_params& params) {
+      std::string mattype = py::reinterpret_borrow<py::str>(Q.attr("format"));
+      if (mattype == "csr") {
+        return nmarkov::ctmc_mexpint_mix<py::object,marlib::CSRMatrixT>(Q, x, cx, w, t, trans, params);
+      } else if (mattype == "csc") {
+        return nmarkov::ctmc_mexpint_mix<py::object,marlib::CSCMatrixT>(Q, x, cx, w, t, trans, params);
+      } else if (mattype == "coo") {
+        return nmarkov::ctmc_mexpint_mix<py::object,marlib::COOMatrixT>(Q, x, cx, w, t, trans, params);
+      } else {
+        throw std::runtime_error("Q is either csr, csc and coo.");
+      }
+    },
+    py::arg("Q"), py::arg("x"), py::arg("cx"), py::arg("w"), py::arg("t"), py::arg("trans"), py::arg("params"),
+    "Compute the mixture of matrix exponential with uniformization");
+
+  m.def("deformula_zerotoinf",
+    nmarkov::deformula_integrate<std::function<double(double)>,deformula::DeformulaZeroToInf>,
+    py::arg("f"), py::arg("zero"), py::arg("reltol"), py::arg("startd"), py::arg("maxiter"),
+    "weights for pdf");
+
+  m.def("deformula_monetoone",
+    nmarkov::deformula_integrate<std::function<double(double)>,deformula::DeformulaMinusOneToOne>,
+    py::arg("f"), py::arg("zero"), py::arg("reltol"), py::arg("startd"), py::arg("maxiter"),
+    "weights for pdf");
 
   // m.def("test",
   //   [](const py::object& X) {

@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse as sp
 import nmarkov._nmarkov as _nm
+import nmarkov.smatrix as sm
+from nmarkov.attrdict import attrdict
 
 def sprob(Q, x0 = None):
     return nctmc(Q).sprob(x0)
@@ -14,11 +16,33 @@ def tprob(Q, t, x0, trans = True, cx0 = None):
 def trwd(Q, t, x0, rwd, trans = True, cx0 = None):
     return nctmc(Q).trwd(t, x0, rwd, trans, cx0)
 
-def mexpAx(Q, x = None, t = 1.0, trans = False):
-    return nctmc(Q).mexpAx(x, t, trans)
+def mexpAx(Q, t = 1.0, x = None, trans = False):
+    return nctmc(Q).mexpAx(t, x, trans)
 
-def cmexpAx(Q, x = None, t = 1.0, trans = False, cx = None):
-    return nctmc(Q).cmexpAx(x, t, trans, cx)
+def cmexpAx(Q, t = 1.0, x = None, trans = False, cx = None):
+    return nctmc(Q).cmexpAx(t, x, trans, cx)
+
+class deformula:
+    def __init__(self):
+        self.zero = 1.0e-12
+        self.reltol = 1.0e-8
+        self.startd = 8
+        self.maxiter = 12
+    
+    def integrate(self, f, domain, *args, **kwargs):
+        if (0, np.inf) == domain:
+            return self._zerotoinf(f, *args, **kwargs)
+        else:
+            return self._monetoone(f, domain[0], domain[1], *args, **kwargs)
+
+    def _zerotoinf(self, f, *args, **kwargs):
+        return _nm.deformula_zerotoinf(f=lambda x:f(x, *args, **kwargs), zero=self.zero, reltol=self.reltol, startd=self.startd, maxiter=self.maxiter)
+    
+    def _monetoone(self, f, lower, upper, *args, **kwargs):
+        dx1 = upper - lower
+        dx2 = upper + lower
+        res = _nm.deformula_monetoone(f=lambda x: dx1 * f((dx1 * x + dx2)/2.0, *args, **kwargs)/2.0, zero=self.zero, reltol=self.reltol, startd=self.startd, maxiter=self.maxiter)
+        return (res[0], (res[1] * dx1 + dx2) / 2.0, res[2], res[3], res[4], res[5])
 
 class _SparseCTMC:
     def __init__(self, Q, params):
@@ -46,6 +70,9 @@ class _SparseCTMC:
     def _cmexpAx(self, x, cx, t, trans):
         return _nm.ctmc_mexpint_sparse(self.Q, x, cx, t, trans, self.params)
 
+    def _mexpAx_mix(self, x, w, t, trans):
+        return _nm.ctmc_mexp_mix_sparse(self.Q, x, w, t, trans, self.params)
+
 class _DenseCTMC:
     def __init__(self, Q, params):
         self.Q = Q
@@ -72,14 +99,17 @@ class _DenseCTMC:
     def _cmexpAx(self, x, cx, t, trans):
         return _nm.ctmc_mexpint_dense(self.Q, x, cx, t, trans, self.params)
 
+    def _mexpAx_mix(self, x, w, t, trans):
+        return _nm.ctmc_mexp_mix_dense(self.Q, x, w, t, trans, self.params)
+
 class nctmc:
     def __init__(self, Q):
         self.params = _nm.Params()
         self.params.eps = np.sqrt(np.finfo(float).eps)
-        if isinstance(Q, smatrix):
-            self.n = Q._get_shape()[0]
+        if isinstance(Q, sm._smatrix):
+            self.n = Q.shape[0]
             self.sprob_method = 'GS'
-            self.Q = _SparseCTMC(Q.tocsc(), self.params)
+            self.Q = _SparseCTMC(Q.tocsc(padding_diag = True), self.params)
         elif isinstance(Q, sp.spmatrix):
             self.n = Q.shape[0]
             self.sprob_method = 'GS'
@@ -106,146 +136,37 @@ class nctmc:
         if cx0 == None:
             cx0 = np.zeros_like(x0)
         dt = np.insert(np.diff(t), 0, t[0])
-        return self.Q._tprob(dt, x0, trans, cx0)
+        res = self.Q._tprob(dt, x0, trans, cx0)
+        return attrdict({'t':t, 'prob':res[0], 'cprob':res[1]})
 
     def trwd(self, t, x0, rwd, trans = True, cx0 = None):
         if cx0 == None:
             cx0 = np.zeros_like(x0)
         dt = np.insert(np.diff(t), 0, t[0])
-        return self.Q._trwd(dt, x0, rwd, trans, cx0)
+        res = self.Q._trwd(dt, x0, rwd, trans, cx0)
+        # if rwd.ndim == 1:
+        return attrdict({'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2], 'crwd':res[3]})
+        # else:
+        #     n = len(t)
+        #     m = rwd.shape[1]
+        #     return attrdict({'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2].reshape(n,m), 'crwd':res[3].reshape(n,m)})
 
-    def mexpAx(self, x = None, t = 1.0, trans = False):
+    def mexpAx(self, t = 1.0, x = None, trans = False):
         if x == None:
             x = np.eye(self.n)
         return self.Q._mexpAx(x, t, trans)
 
-    def cmexpAx(self, x = None, t = 1.0, trans = False, cx = None):
+    def cmexpAx(self, t = 1.0, x = None, trans = False, cx = None):
         if x == None:
             x = np.eye(self.n)
         if cx == None:
             cx = np.zeros_like(x)
-        return self.Q._cmexpAx(x, cx, t, trans)
+        res = self.Q._cmexpAx(x, cx, t, trans)
+        return attrdict({'x':res[0], 'cx':res[1]})
 
-class smatrix:
-    def _get_shape(self):
-        pass
+    def mexpAx_mix(self, f, x = None, domain = (0, np.inf), trans = False, *args, **kwargs):
+        if x == None:
+            x = np.eye(self.n)
+        res = deformula().integrate(f, domain, *args, **kwargs)
+        return self.Q._mexpAx_mix(x, res[2], res[1], trans) * res[4]
 
-    def _get_elem(self, xstart = 0, ystart = 0):
-        pass
-
-    def tocoo(self, xstart = 0, ystart = 0, diag = True):
-        x = self._get_elem(xstart, ystart)
-        shape = self._get_shape()
-        if diag == True:
-            i = np.array(range(min(shape)), dtype=np.int32)
-            v = np.zeros(min(shape))
-            x = (np.hstack((x[0], i)), np.hstack((x[1], i)), np.hstack((x[2], v)))
-        Q = sp.coo_matrix((x[2], (x[0], x[1])), shape=self._get_shape())
-        Q.sum_duplicates()
-        return Q
-
-    def tocsc(self, xstart = 0, ystart = 0, diag = True):
-        Q = self.tocoo(xstart, ystart, diag)
-        return Q.tocsc()
-
-    def tocsr(self, xstart = 0, ystart = 0, diag = True):
-        Q = self.tocoo(xstart, ystart, diag)
-        return Q.tocsr()
-
-class bmatrix(smatrix):
-    def __init__(self):
-        self.rows = {}
-        self.cols = {}
-        self.elem = {}
-
-    def __str__(self):
-        return 'smatrix({})'.format(self.elem)
-
-    def _get_shape(self):
-        x = sum(self.rows.values())
-        y = sum(self.cols.values())
-        return (x,y)
-
-    def set(self, i, j, elem):
-        shape = elem._get_shape()
-        self.rows[i] = shape[0]
-        self.cols[j] = shape[1]
-        self.elem[(i,j)] = elem
-
-    def _get_elem(self, xstart = 0, ystart = 0):
-        xindex = {}
-        xlabels = sorted(self.rows.items(), key=lambda x:x[0])
-        xindex[xlabels[0][0]] = xstart
-        for i in range(1,len(self.rows)):
-            xindex[xlabels[i][0]] = xindex[xlabels[i-1][0]] + xlabels[i][1]
-        yindex = {}
-        ylabels = sorted(self.cols.items(), key=lambda x:x[0])
-        yindex[ylabels[0][0]] = ystart
-        for i in range(1,len(self.cols)):
-            yindex[ylabels[i][0]] = yindex[ylabels[i-1][0]] + ylabels[i][1]
-        
-        i = np.array([], dtype=np.int32)
-        j = np.array([], dtype=np.int32)
-        v = np.array([], dtype=np.float)
-        for x in self.elem.items():
-            res = x[1]._get_elem(xindex[x[0][0]], yindex[x[0][1]])
-            i = np.hstack((i, res[0]))
-            j = np.hstack((j, res[1]))
-            v = np.hstack((v, res[2]))
-        return (i,j,v)
-
-class nmatrix(smatrix):
-    def __init__(self, A):
-        self.A = A
-
-    def _get_shape(self):
-        return self.A.shape
-
-    def _get_elem(self, xstart = 0, ystart = 0):
-        A = sp.coo_matrix(self.A)
-        return (xstart+A.row, ystart+A.col, A.data)
-
-    def __repr__(self):
-        return self.A.__repr__()
-
-    def __str__(self):
-        return self.A.__str__()
-
-class zeros(nmatrix):
-    def __init__(self, shape):
-        super().__init__(sp.coo_matrix(shape, dtype=np.float))
-
-class eye(nmatrix):
-    def __init__(self, m, n=None, k=0):
-        super().__init__(sp.eye(m=m, n=n, k=k, dtype=np.float, format='coo'))
-
-
-## methods
-
-def cblock(*args):
-    A = bmatrix()
-    for i in range(len(args)):
-        if isinstance(args[i], smatrix):
-            A.set(0, i, args[i])
-        else:
-            A.set(0, i, nmatrix(args[i]))
-    return A
-
-def rblock(*args):
-    A = bmatrix()
-    for i in range(len(args)):
-        if isinstance(args[i], smatrix):
-            A.set(i, 0, args[i])
-        else:
-            A.set(i, 0, nmatrix(args[i]))
-    return A
-
-def block(list):
-    A = bmatrix()
-    for i in range(len(list)):
-        for j in range(len(list[i])):
-            if isinstance(list[i][j], smatrix):
-                A.set(i, j, list[i][j])
-            else:
-                A.set(i, j, nmatrix(list[i][j]))
-    return A
