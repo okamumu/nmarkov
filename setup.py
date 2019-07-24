@@ -30,7 +30,7 @@ ext_modules = [
             get_pybind_include(user=True),
             'marlib'
         ],
-        libraries=['blas','lapack'],
+        libraries=['mkl_rt','pthread'],
         language='c++'
     ),
 ]
