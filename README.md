@@ -2,7 +2,24 @@
 
 Python module for numerical computation of Markov chains
 
-## Install
+## Installation
+
+### Make environment with conda
+
+The recommendation is to use Anaconda/Miniconda with your own environment for nmarkov.
+
+```sh
+conda create -n nmarkov python=3.6 jupyter numpy scipy pybind11
+pip install git+https://github.com/okamumu/nmarkov.git
+```
+
+For Jupyter, make the kernel for the environment `nmarkov`
+```
+conda activate nmarkov
+ipython kernel install --user --name nmarkov
+```
+
+### Install with pip
 
 ```sh
 pip install git+https://github.com/okamumu/nmarkov.git
@@ -12,7 +29,4 @@ Requriements:
 - pybind11
 - numpy
 - scipy
-
-I have succeed to install it only on Linux. Please check the environment with Docker file on the repository (https://github.com/okamumu/nmarkov_example).
-
 
