@@ -22,13 +22,15 @@ class get_pybind_include(object):
 
 ext_modules = [
     Extension(
-        '_nmarkov',
-        ['src/nmarkov.cpp'],
+        'nmarkov._nmarkov',
+        ['src/_nmarkov.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
-            get_pybind_include(user=True)
+            get_pybind_include(user=True),
+            'marlib'
         ],
+        libraries=['blas','lapack'],
         language='c++'
     ),
 ]
@@ -104,8 +106,9 @@ setup(
     url='https://github.com/okamumu/nmarkov',
     description='Numerical computation for Markov chains',
     long_description='',
+    packages=['nmarkov'],
     ext_modules=ext_modules,
-    install_requires=['pybind11>=2.3'],
+    install_requires=['pybind11>=2.3', 'numpy', 'scipy'],
     setup_requires=['pybind11>=2.3'],
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
