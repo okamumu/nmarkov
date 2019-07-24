@@ -1,6 +1,6 @@
-# relpy
+# nmarkov
 
-Python module for reliability computation
+Python module for numerical computation of Markov chains
 
 ## How to try
 

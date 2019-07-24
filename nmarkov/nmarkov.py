@@ -2,7 +2,6 @@ import numpy as np
 import scipy.sparse as sp
 import nmarkov._nmarkov as _nm
 import nmarkov.smatrix as sm
-from nmarkov.attrdict import attrdict
 
 def sprob(Q, x0 = None):
     return nctmc(Q).sprob(x0)
@@ -82,6 +81,12 @@ class _DenseCTMC:
         return _nm.ctmc_st_gth_dense(self.Q)
     
     def _sprob_gs(self, x0):
+        try:
+            res = _nm.ctmc_st_gs_dense(self.Q, x0, self.params)
+            if self.params.info == -1:
+                raise RuntimeError("Do not convergence")
+        except RuntimeError:
+            pass
         return _nm.ctmc_st_gs_dense(self.Q, x0, self.params)
 
     def _ssen_gs(self, x0, b, pis):
@@ -137,19 +142,19 @@ class nctmc:
             cx0 = np.zeros_like(x0)
         dt = np.insert(np.diff(t), 0, t[0])
         res = self.Q._tprob(dt, x0, trans, cx0)
-        return attrdict({'t':t, 'prob':res[0], 'cprob':res[1]})
+        return {'t':t, 'prob':res[0], 'cprob':res[1]}
 
     def trwd(self, t, x0, rwd, trans = True, cx0 = None):
         if cx0 == None:
             cx0 = np.zeros_like(x0)
         dt = np.insert(np.diff(t), 0, t[0])
         res = self.Q._trwd(dt, x0, rwd, trans, cx0)
-        # if rwd.ndim == 1:
-        return attrdict({'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2], 'crwd':res[3]})
-        # else:
-        #     n = len(t)
-        #     m = rwd.shape[1]
-        #     return attrdict({'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2].reshape(n,m), 'crwd':res[3].reshape(n,m)})
+        if rwd.ndim == 1:
+            return {'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2], 'crwd':res[3]}
+        else:
+            n = len(t)
+            m = rwd.shape[1]
+            return {'t':t, 'prob':res[0], 'cprob':res[1], 'irwd':res[2].reshape(n,m), 'crwd':res[3].reshape(n,m)}
 
     def mexpAx(self, t = 1.0, x = None, trans = False):
         if x == None:
@@ -162,7 +167,7 @@ class nctmc:
         if cx == None:
             cx = np.zeros_like(x)
         res = self.Q._cmexpAx(x, cx, t, trans)
-        return attrdict({'x':res[0], 'cx':res[1]})
+        return {'x':res[0], 'cx':res[1]}
 
     def mexpAx_mix(self, f, x = None, domain = (0, np.inf), trans = False, *args, **kwargs):
         if x == None:
