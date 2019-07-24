@@ -9,7 +9,7 @@ Python module for numerical computation of Markov chains
 The recommendation is to use Anaconda/Miniconda with your own environment for nmarkov.
 
 ```sh
-conda create -n nmarkov python=3.6 jupyter numpy scipy pybind11
+conda create -n nmarkov python=3.6 jupyter numpy scipy matplotlib pybind11
 conda activate nmarkov
 pip install git+https://github.com/okamumu/nmarkov.git
 ```
