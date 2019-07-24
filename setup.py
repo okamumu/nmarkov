@@ -2,6 +2,18 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
+from scipy._build_utils.system_info import get_info, NotFoundError
+
+
+def getblas():
+    lapack_opt = get_info('lapack_opt')
+    if not lapack_opt:
+        msg = 'No lapack/blas resources found.'
+        if sys.platform == "darwin":
+            msg = ('No lapack/blas resources found. '
+                   'Note: Accelerate is no longer supported.')
+        raise NotFoundError(msg)
+    return lapack_opt
 
 __version__ = '0.8.0'
 
@@ -19,7 +31,7 @@ class get_pybind_include(object):
         import pybind11
         return pybind11.get_include(self.user)
 
-
+blasinfo = getblas()
 ext_modules = [
     Extension(
         'nmarkov._nmarkov',
@@ -30,7 +42,8 @@ ext_modules = [
             get_pybind_include(user=True),
             'marlib'
         ],
-        libraries=['mkl_rt','pthread'],
+        library_dirs=blasinfo['library_dirs'],
+        libraries=blasinfo['libraries'],
         language='c++'
     ),
 ]
