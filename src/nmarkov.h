@@ -1,9 +1,6 @@
-#if _MSC_VER < 1900
-#define snprintf _snprintf
-#endif
-
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+//#include <pybind11/iostream.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy.h>
 #include <pybind11/functional.h>

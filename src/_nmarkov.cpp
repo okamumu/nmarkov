@@ -49,7 +49,7 @@ namespace nmarkov {
     dpyarray y = clone(x, VecT());
     marlib::mexp_func(TR(), P, x, y, t, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
                 },
               MatT(), VecT());
     return y;
@@ -145,7 +145,8 @@ namespace nmarkov {
     dpyarray res_crwd(m*s);
     marlib::ctmc_tran_rwd(TR(), P, y, cy, rwd, t, res_irwd, res_crwd, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               [](Params){},
               MatT(), VecT(), VecT2());
@@ -182,7 +183,8 @@ namespace nmarkov {
     dpyarray y = clone(x, VecT());
     marlib::mexp_mix(TR(), P, x0, y, w, t, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               [](Params){},
               MatT(), VecT());
@@ -215,7 +217,8 @@ namespace nmarkov {
     dpyarray cy = clone(cx, VecT());
     marlib::mexpint_mix(TR(), P, x0, cx0, y, cy, w, t, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               [](Params){},
               MatT(), VecT());
