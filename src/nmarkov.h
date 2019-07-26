@@ -1,10 +1,9 @@
-#include <string>
-#include <cstdio>
-#include <vector>
+#if _MSC_VER < 1900
+#define snprintf _snprintf
+#endif
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-//#include <pybind11/iostream.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy.h>
 #include <pybind11/functional.h>
@@ -121,12 +120,4 @@ namespace marlib {
   py::object clone(const py::object& x, COOMatrixT) {
     return x.attr("copy")();
   }
-}
-
-template <typename ... Args>
-std::string format(const std::string& fmt, Args ... args ) {
-  size_t len = std::snprintf( nullptr, 0, fmt.c_str(), args ... );
-  std::vector<char> buf(len + 1);
-  std::snprintf(&buf[0], len + 1, fmt.c_str(), args ... );
-  return std::string(&buf[0], &buf[0] + len);
 }
