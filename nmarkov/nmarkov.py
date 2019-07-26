@@ -21,6 +21,12 @@ def mexpAx(Q, t = 1.0, x = None, trans = False):
 def cmexpAx(Q, t = 1.0, x = None, trans = False, cx = None):
     return nctmc(Q).cmexpAx(t, x, trans, cx)
 
+def mexpAx_mix(Q, f, x = None, domain = (0, np.inf), trans = False, *args, **kwargs):
+    return nctmc(Q).mexpAx_mix(f, x, domain, trans, *args, **kwargs)
+
+def cmexpAx_mix(Q, f, x = None, domain = (0, np.inf), trans = False, cx = None, *args, **kwargs):
+    return nctmc(Q).cmexpAx_mix(f, x, domain, trans, cx, *args, **kwargs)
+
 class deformula:
     def __init__(self):
         self.zero = 1.0e-12
@@ -72,6 +78,9 @@ class _SparseCTMC:
     def _mexpAx_mix(self, x, w, t, trans):
         return _nm.ctmc_mexp_mix_sparse(self.Q, x, w, t, trans, self.params)
 
+    def _cmexpAx_mix(self, x, cx, w, t, trans):
+        return _nm.ctmc_mexpint_mix_sparse(self.Q, x, cx, w, t, trans, self.params)
+
 class _DenseCTMC:
     def __init__(self, Q, params):
         self.Q = Q
@@ -106,6 +115,9 @@ class _DenseCTMC:
 
     def _mexpAx_mix(self, x, w, t, trans):
         return _nm.ctmc_mexp_mix_dense(self.Q, x, w, t, trans, self.params)
+
+    def _cmexpAx_mix(self, x, cx, w, t, trans):
+        return _nm.ctmc_mexpint_mix_dense(self.Q, x, cx, w, t, trans, self.params)
 
 class nctmc:
     def __init__(self, Q):
@@ -175,3 +187,11 @@ class nctmc:
         res = deformula().integrate(f, domain, *args, **kwargs)
         return self.Q._mexpAx_mix(x, res[2], res[1], trans) * res[4]
 
+    def cmexpAx_mix(self, f, x = None, domain = (0, np.inf), trans = False, cx = None, *args, **kwargs):
+        if x == None:
+            x = np.eye(self.n)
+        if cx == None:
+            cx = np.zeros_like(x)
+        res = deformula().integrate(f, domain, *args, **kwargs)
+        m, cm = self.Q._cmexpAx_mix(x, cx, res[2], res[1], trans)
+        return (m*res[4], cm*res[4])

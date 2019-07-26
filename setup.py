@@ -6,16 +6,10 @@ from scipy._build_utils.system_info import get_info, NotFoundError
 
 
 def getblas():
-    lapack_opt = get_info('lapack_opt')
-    if not lapack_opt:
-        msg = 'No lapack/blas resources found.'
-        if sys.platform == "darwin":
-            msg = ('No lapack/blas resources found. '
-                   'Note: Accelerate is no longer supported.')
-        raise NotFoundError(msg)
-    return lapack_opt
+    import numpy
+    return numpy.__config__.get_info('blas_opt_info')
 
-__version__ = '0.8.0'
+__version__ = '0.8.1'
 
 class get_pybind_include(object):
     """Helper class to determine the pybind11 include path
@@ -122,8 +116,8 @@ setup(
     long_description='',
     packages=['nmarkov'],
     ext_modules=ext_modules,
-    install_requires=['pybind11>=2.3', 'numpy', 'scipy'],
-    setup_requires=['pybind11>=2.3'],
+    install_requires=['pybind11', 'numpy', 'scipy'],
+    setup_requires=['pybind11', 'numpy'],
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
 )
