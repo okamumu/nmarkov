@@ -49,7 +49,8 @@ namespace nmarkov {
     dpyarray y = clone(x, VecT());
     marlib::mexp_func(TR(), P, x, y, t, params,
               [](Params& params){
-                throw std::runtime_error("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               MatT(), VecT());
     return y;
@@ -78,7 +79,8 @@ namespace nmarkov {
     dpyarray cy = clone(cx, VecT());
     marlib::mexpint_func(TR(), P, x, y, cy, t, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               MatT(), VecT());
     return std::make_tuple(y, cy);
@@ -111,7 +113,8 @@ namespace nmarkov {
     dpyarray res_cx(m*s);
     marlib::ctmc_tran(TR(), P, y, cy, t, res_x, res_cx, params,
               [](Params& params){
-                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+//                throw std::runtime_error(format("Time interval is too large: right = %d (rmax: %d).", params.r, params.rmax));
+                throw std::runtime_error("Time interval is too large");
                 },
               [](Params){},
               MatT(), VecT());
